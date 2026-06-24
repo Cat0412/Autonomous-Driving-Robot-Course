@@ -16,7 +16,7 @@
 * Validation dataset: 154장
 * Test dataset: 75장
 
-또한 실제 프로젝트 환경과 유사한 조건을 반영하기 위해, 팀에서 직접 촬영한 누워 있는 사람 이미지 8장을 추가로 라벨링하여 train 데이터셋에 포함하였다. 추가 데이터는 Roboflow에서 기존 데이터셋과 동일하게 YOLOv8 bounding box 형식으로 라벨링하였으며, 클래스명은 기존 `data.yaml`과 동일하게 `Fallen Person`으로 통일하였다.
+또한 실제 프로젝트 환경과 유사한 조건을 반영하기 위해, 직접 Storagy로봇 웹캠을 통해 촬영한 누워 있는 사람 이미지 8장을 추가로 라벨링하여 train 데이터셋에 포함하였다. 추가 데이터는 Roboflow에서 기존 데이터셋과 동일하게 YOLOv8 bounding box 형식으로 라벨링하였으며, 클래스명은 기존 `data.yaml`과 동일하게 `Fallen Person`으로 통일하였다.
 
 최종 데이터셋 구조는 다음과 같다.
 
