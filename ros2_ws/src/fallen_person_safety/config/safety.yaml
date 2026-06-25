@@ -1,0 +1,25 @@
+fallen_person_safety:
+  ros__parameters:
+    rgb_topic: /camera/color/image_raw
+    depth_topic: /camera/depth/image_raw
+    cmd_vel_topic: /cmd_vel_safety
+
+    confidence_threshold: 0.40
+    inference_image_size: 640
+    inference_rate_hz: 8.0
+    control_rate_hz: 20.0
+
+    search_angular_speed: 0.15
+    detection_stop_sec: 0.30
+    detection_hold_sec: 2.0
+    align_angular_gain: 0.8
+    max_angular_speed: 0.15
+    center_tolerance_ratio: 0.10
+    approach_linear_speed: 0.08
+
+    stop_distance_m: 0.50
+    minimum_valid_depth_m: 0.20
+    maximum_valid_depth_m: 8.0
+
+    snapshot_directory: ~/fallen_person_incidents
+    local_terminal_beep: true
