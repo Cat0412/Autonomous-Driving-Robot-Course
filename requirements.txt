@@ -1,3 +1,5 @@
+#.venv 라이브러리 목록
+
 action-msgs==1.2.1
 action-tutorials-interfaces==0.20.5
 action-tutorials-py==0.20.5
