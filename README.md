@@ -1,78 +1,140 @@
-# Autonomous-Driving-Robot-Course
-2026 광운대 자율주행 로봇 전문가 과정
-## Fallen Person Detection Model
+# YOLO 기반 쓰러진 작업자 감지·접근 로봇
 
-본 프로젝트에서는 스토리지 로봇의 카메라를 이용해 바닥에 누워 있는 사람을 탐지하기 위해 YOLOv8 기반 객체 탐지 모델을 학습하였다. 탐지 대상 클래스는 `Fallen Person` 1개로 설정하였으며, 로봇이 누워 있는 사람을 인식한 뒤 해당 위치로 접근하고 정지 및 알림을 수행하는 기능 구현을 목표로 한다.
+2026 광운대학교 자율주행 로봇 전문가 과정 프로젝트이다.
 
-### Dataset
+스토리지 로봇이 RGB-D 카메라로 주변을 감시하며 천천히 회전하고, YOLO 모델이 바닥에 누워 있는 사람을 감지하면 회전을 멈춘 뒤 해당 사람에게 접근한다. 도착 후에는 사고 사진과 메시지를 ROS2 토픽으로 관리자에게 전달하고 경고음을 출력한다.
 
-기본 학습 데이터셋은 Roboflow Universe의 People Falls Dataset v1을 사용하였다.
+## 주요 기능
 
-* Dataset source: https://universe.roboflow.com/project/people-falls/dataset/1
-* Task: Object Detection
-* Format: YOLOv8
-* Class: `Fallen Person`
-* Train dataset: 547장
-* Validation dataset: 154장
-* Test dataset: 75장
+- YOLOv8n 기반 `Fallen Person` 실시간 감지
+- RViz에서 바운딩박스와 로봇 상태 표시
+- 제자리 회전 탐색 및 감지 즉시 정지
+- 바운딩박스 중심을 이용한 방향 정렬
+- RGB-D 깊이 정보를 이용한 거리 측정 및 접근
+- 약 0.5m 앞에서 정지
+- 사고 사진 저장 및 관리자 메시지 전송
+- 노트북 터미널 경고음 출력
 
-또한 실제 프로젝트 환경과 유사한 조건을 반영하기 위해, 직접 Storagy로봇 웹캠을 통해 촬영한 누워 있는 사람 이미지 8장을 추가로 라벨링하여 train 데이터셋에 포함하였다. 추가 데이터는 Roboflow에서 기존 데이터셋과 동일하게 YOLOv8 bounding box 형식으로 라벨링하였으며, 클래스명은 기존 `data.yaml`과 동일하게 `Fallen Person`으로 통일하였다.
-
-최종 데이터셋 구조는 다음과 같다.
+## 동작 흐름
 
 ```text
-people_falls_yolov8/
-├── train/
-│   ├── images/
-│   └── labels/
-├── valid/
-│   ├── images/
-│   └── labels/
-├── test/
-│   ├── images/
-│   └── labels/
-└── data.yaml
+SEARCH → DETECTED → APPROACH → ARRIVED
 ```
 
-### Model Training
+1. `SEARCH`: 로봇이 천천히 회전하며 주변을 감시한다.
+2. `DETECTED`: 쓰러진 사람을 감지하면 즉시 정지한다.
+3. `APPROACH`: 사람을 화면 중앙에 맞추며 접근한다.
+4. `ARRIVED`: 목표 거리에서 정지하고 사진·메시지·경고음을 전송한다.
 
-학습에는 YOLOv8 계열 중 가장 가벼운 nano 모델인 `YOLOv8n`을 사용하였다. 스토리지 로봇의 실시간 인식 환경을 고려하여, 정확도보다 추론 속도와 경량성을 우선적으로 고려하였다.
+## 시스템 구조
 
-Colab 환경에서 다음과 같이 학습을 진행하였다.
-
-```python
-from ultralytics import YOLO
-
-model = YOLO("yolov8n.pt")
-
-model.train(
-    data="/content/people_falls_yolov8/data.yaml",
-    epochs=80,
-    imgsz=640,
-    batch=16,
-    name="fallen_person_yolov8n"
-)
+```mermaid
+flowchart LR
+    Camera["Orbbec RGB-D Camera"] -->|RGB| YOLO["YOLO Fallen Person Detection"]
+    Camera -->|Depth| Controller["Approach Controller"]
+    YOLO --> Controller
+    Controller -->|/cmd_vel_safety| Mux["Velocity Mux"]
+    Nav2["Navigation2"] -->|/cmd_vel_nav_smoothed| Mux
+    Mux -->|/cmd_vel| Motor["Motor Driver"]
+    Controller -->|/safety/debug_image| RViz["RViz"]
+    Controller -->|Message & Snapshot| Admin["Admin Monitor"]
 ```
 
-학습 완료 후 생성된 최종 모델 파일은 다음 경로의 `best.pt`를 사용하였다.
+## YOLO 모델
 
-```text
-runs/detect/fallen_person_yolov8n/weights/best.pt
-```
+Roboflow의 People Falls Dataset v1과 직접 촬영한 이미지를 사용해 `YOLOv8n`을 학습했다.
 
-### Training Result
-
-학습 결과는 다음과 같다.
-
-| Metric    | Result |
-| --------- | -----: |
+| 항목 | 결과 |
+|---|---:|
+| 클래스 | `Fallen Person` |
 | Precision | `0.98657` |
-| Recall    | ` 0.95371` |
-| mAP50     | `0.97234` |
-| mAP50-95  | `0.92417` |
+| Recall | `0.95371` |
+| mAP50 | `0.97234` |
+| mAP50-95 | `0.92417` |
 
-검증 이미지에 대한 예측 결과를 확인한 결과, 모델은 바닥에 누워 있는 사람을 `Fallen Person` 클래스로 탐지하는 것을 확인하였다. 추가로 직접 촬영한 이미지 8장을 train 데이터에 포함하여, 실제 실험 환경에서의 누운 사람 자세와 카메라 각도에 대한 적응성을 높이고자 하였다.
+학습 코드와 모델은 다음 위치에 있다.
 
-### Real-Time Inference Plan
+```text
+Autonomous_Robot_Yolo_train.ipynb
+yolo_눕방_detection/models/best.pt
+ros2_ws/best.pt
+```
 
-학습된 `best.pt` 모델은 이후 웹캠 또는 스토리지 로봇의 RGB 카메라 입력에 적용할 예정이다. 실시간 추론에서는 YOLOv8n 모델을 사용하여 프레임 단위로 `Fallen Person` 객체를 탐지하고, 탐지된 bounding box의 중심 좌표와 depth 정보를 결합하여 로봇이 대상 위치로 접근하도록 확장할 계획이다.
+## 프로젝트 구조
+
+```text
+.
+├── Autonomous_Robot_Yolo_train.ipynb
+├── requirements.txt
+├── yolo_눕방_detection/
+│   ├── models/best.pt
+│   └── scripts/realtime_detection_webcam.py
+└── ros2_ws/
+    ├── best.pt
+    └── src/
+        ├── fallen_person_safety/
+        ├── storagy/
+        ├── motor_driver2/
+        └── aruco_moving1/
+```
+
+## 실행 환경
+
+- Ubuntu 22.04
+- ROS2 Humble
+- Python 3.10
+- Ultralytics YOLO
+- OpenCV
+- Orbbec RGB-D Camera
+- Navigation2 / RViz2
+
+Navigation2와 OrbbecSDK ROS2 패키지는 로봇 PC에 별도로 설치되어 있어야 한다.
+
+## 빌드
+
+```bash
+cd ros2_ws
+source /opt/ros/humble/setup.bash
+python3 -m venv --system-site-packages .venv
+source .venv/bin/activate
+pip install ultralytics opencv-python
+python -m colcon build --symlink-install
+source install/setup.bash
+```
+
+## 실행
+
+터미널 1 — 로봇, 카메라, 모터, RViz:
+
+```bash
+cd ros2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch storagy bringup.launch.py
+```
+
+터미널 2 — YOLO 감지 및 접근 제어:
+
+```bash
+cd ros2_ws
+source /opt/ros/humble/setup.bash
+source .venv/bin/activate
+source install/setup.bash
+ros2 launch fallen_person_safety fallen_person_safety.launch.py
+```
+
+RViz에서는 `/safety/debug_image` 토픽을 통해 YOLO 결과를 확인할 수 있다.
+
+## 주요 ROS2 토픽
+
+| 토픽 | 역할 |
+|---|---|
+| `/camera/color/image_raw` | RGB 카메라 영상 |
+| `/camera/depth/image_raw` | 깊이 영상 |
+| `/safety/debug_image` | YOLO 바운딩박스 영상 |
+| `/cmd_vel_safety` | 사람 접근 속도 명령 |
+| `/cmd_vel` | 모터 드라이버 최종 명령 |
+| `/safety/incident` | 관리자 사고 메시지 |
+| `/safety/snapshot/compressed` | 사고 현장 사진 |
+
+캡처 이미지는 `~/fallen_person_incidents`와 `~/fallen_person_admin_received`에 저장된다.
